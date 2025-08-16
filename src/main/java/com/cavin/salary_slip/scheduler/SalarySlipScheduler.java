@@ -3,20 +3,35 @@ package com.cavin.salary_slip.scheduler;
 import com.cavin.salary_slip.model.Employee;
 import com.cavin.salary_slip.service.ExcelReaderService;
 import com.cavin.salary_slip.service.PdfService;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import jakarta.annotation.PostConstruct;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.io.File;
-import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 
 @Component
 public class SalarySlipScheduler {
 
+    private static final Logger logger = LoggerFactory.getLogger(SalarySlipScheduler.class);
+
     private final ExcelReaderService excelReaderService;
     private final PdfService pdfService;
+
+    @Value("${salary.slip.excel.path}")
+    private String excelPath;
+
+    @Value("${salary.slip.output.dir}")
+    private String baseOutputDir;
+
+    @Value("${salary.slip.scheduler.cron}")
+    private String schedulerCron;
 
     public SalarySlipScheduler(ExcelReaderService excelReaderService, PdfService pdfService) {
         this.excelReaderService = excelReaderService;
@@ -27,48 +42,53 @@ public class SalarySlipScheduler {
      * Runs every day at 10 AM
      * Cron format: second minute hour day month weekday
      */
-    @Scheduled(cron = "0 0 10 * * ?")
+    @Scheduled(cron = "${salary.slip.scheduler.cron}")
     public void generateSalarySlips() {
         try {
-            String excelPath = "C:\\workspace\\JulySalaryEPF1.xlsx";
-            String outputDir = "C:\\workspace\\slips\\";
+            // Create unique output directory with timestamp
+            LocalDateTime now = LocalDateTime.now();
+            String timestamp = now.format(DateTimeFormatter.ofPattern("yyyy-MM-dd_HHmmss"));
+            String uniqueOutputDir = baseOutputDir + timestamp + "/";
 
-            // Make sure output folder exists
-            File dir = new File(outputDir);
+            File dir = new File(uniqueOutputDir);
             if (!dir.exists()) {
-                dir.mkdirs();
+                boolean created = dir.mkdirs();
+                if (!created) {
+                    logger.error("Failed to create output directory: {}", uniqueOutputDir);
+                    return;
+                }
             }
 
             // Get current month name for sheet selection
-            String currentMonthSheet = LocalDate.now().format(DateTimeFormatter.ofPattern("MMMM yyyy"));
-            //String currentMonthSheet = null;
+            String currentMonthSheet = now.format(DateTimeFormatter.ofPattern("MMMM yyyy"));
 
-                    // Try to read from current month's sheet, fall back to first sheet if not found
+            // Try to read from current month's sheet, fall back to first sheet if not found
             List<Employee> employees;
             try {
                 employees = excelReaderService.readEmployeesFromExcel(excelPath, currentMonthSheet);
-                System.out.println("Reading from sheet: " + currentMonthSheet);
+                logger.info("Reading from sheet: {}", currentMonthSheet);
             } catch (IllegalArgumentException e) {
                 employees = excelReaderService.readEmployeesFromExcel(excelPath);
-                System.out.println("Sheet " + currentMonthSheet + " not found, using default sheet");
+                logger.warn("Sheet {} not found, using default sheet", currentMonthSheet);
             }
 
             // Generate PDF for each employee
             for (Employee emp : employees) {
-                String pdfPath = outputDir + emp.getEmployeeName() + "_SalarySlip.pdf";
+                String pdfPath = uniqueOutputDir + emp.getEmployeeName() + "_SalarySlip.pdf";
                 pdfService.generateSalarySlip(emp, pdfPath);
-                System.out.println("Generated slip for: " + emp.getEmployeeName());
+                logger.info("Generated slip for: {} in directory: {}", emp.getEmployeeName(), uniqueOutputDir);
             }
 
+            logger.info("Successfully generated all salary slips in directory: {}", uniqueOutputDir);
+
         } catch (Exception e) {
-            System.err.println("Error generating salary slips: " + e.getMessage());
-            e.printStackTrace();
+            logger.error("Error generating salary slips", e);
         }
     }
 
     @PostConstruct
     public void onStartup() {
-        System.out.println("Running salary slip generation on startup...");
+        logger.info("Running salary slip generation on startup...");
         generateSalarySlips();
     }
 }
