@@ -1,5 +1,6 @@
 package com.cavin.salary_slip.scheduler;
 
+import com.cavin.salary_slip.constants.AppConstants;
 import com.cavin.salary_slip.model.Employee;
 import com.cavin.salary_slip.service.ExcelReaderService;
 import com.cavin.salary_slip.service.PdfService;
@@ -7,13 +8,11 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import jakarta.annotation.PostConstruct;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
 import java.util.List;
 
 @Component
@@ -47,22 +46,20 @@ public class SalarySlipScheduler {
         try {
             // Create unique output directory with timestamp
             LocalDateTime now = LocalDateTime.now();
-            String timestamp = now.format(DateTimeFormatter.ofPattern("yyyy-MM-dd_HHmmss"));
-            String uniqueOutputDir = baseOutputDir + timestamp + "/";
+            String timestamp = now.format(AppConstants.TIMESTAMP_FORMATTER);
+            String uniqueOutputDir = baseOutputDir + AppConstants.BATCH_PREFIX + timestamp + "/";
 
             File dir = new File(uniqueOutputDir);
             if (!dir.exists()) {
                 boolean created = dir.mkdirs();
                 if (!created) {
-                    logger.error("Failed to create output directory: {}", uniqueOutputDir);
+                    logger.error(AppConstants.DIR_CREATE_ERROR + ": {}", uniqueOutputDir);
                     return;
                 }
             }
 
-            // Get current month name for sheet selection
-            String currentMonthSheet = now.format(DateTimeFormatter.ofPattern("MMMM yyyy"));
-
             // Try to read from current month's sheet, fall back to first sheet if not found
+            String currentMonthSheet = now.format(AppConstants.MONTH_YEAR_FORMATTER);
             List<Employee> employees;
             try {
                 employees = excelReaderService.readEmployeesFromExcel(excelPath, currentMonthSheet);
@@ -74,15 +71,17 @@ public class SalarySlipScheduler {
 
             // Generate PDF for each employee
             for (Employee emp : employees) {
-                String pdfPath = uniqueOutputDir + emp.getEmployeeName() + "_SalarySlip.pdf";
+                String pdfPath = uniqueOutputDir + emp.getEmployeeName() + AppConstants.PDF_FILE_SUFFIX;
                 pdfService.generateSalarySlip(emp, pdfPath);
                 logger.info("Generated slip for: {} in directory: {}", emp.getEmployeeName(), uniqueOutputDir);
             }
 
-            logger.info("Successfully generated all salary slips in directory: {}", uniqueOutputDir);
+            String successMessage = String.format(AppConstants.SUCCESS_MESSAGE_FORMAT, employees.size(), uniqueOutputDir);
+            logger.info(successMessage);
 
         } catch (Exception e) {
-            logger.error("Error generating salary slips", e);
+            String errorMessage = String.format(AppConstants.GENERATE_ERROR_FORMAT, e.getMessage());
+            logger.error(errorMessage, e);
         }
     }
 

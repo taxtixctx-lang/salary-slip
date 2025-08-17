@@ -1,5 +1,6 @@
 package com.cavin.salary_slip.controller;
 
+import com.cavin.salary_slip.constants.AppConstants;
 import com.cavin.salary_slip.model.Employee;
 import com.cavin.salary_slip.service.ExcelReaderService;
 import com.cavin.salary_slip.service.PdfService;
@@ -22,7 +23,6 @@ import java.io.File;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
 import java.util.List;
 
 @RestController
@@ -65,26 +65,26 @@ public class SalarySlipController {
         try {
             // Create unique output directory with timestamp
             LocalDateTime now = LocalDateTime.now();
-            String timestamp = now.format(DateTimeFormatter.ofPattern("yyyy-MM-dd_HHmmss"));
-            String uniqueOutputDir = baseOutputDir + timestamp + "/";
+            String timestamp = now.format(AppConstants.TIMESTAMP_FORMATTER);
+            String uniqueOutputDir = baseOutputDir + AppConstants.BATCH_PREFIX + timestamp + "/";
 
             File dir = new File(uniqueOutputDir);
             if (!dir.exists()) {
                 boolean created = dir.mkdirs();
                 if (!created) {
-                    logger.error("Failed to create output directory: {}", uniqueOutputDir);
+                    logger.error(AppConstants.DIR_CREATE_ERROR + ": {}", uniqueOutputDir);
                     return ResponseEntity.internalServerError()
-                            .body(new Response(false, "Failed to create output directory", 0));
+                            .body(new Response(false, AppConstants.DIR_CREATE_ERROR, 0));
                 }
             }
 
             // Save the uploaded file temporarily
-            Path tempPath = Files.createTempFile("upload_", ".xlsx");
+            Path tempPath = Files.createTempFile(AppConstants.TEMP_FILE_PREFIX, AppConstants.TEMP_FILE_SUFFIX);
             excelFile.transferTo(tempPath.toFile());
 
             // Get current month name if no sheet specified
             if (sheetName == null || sheetName.isEmpty()) {
-                sheetName = now.format(DateTimeFormatter.ofPattern("MMMM yyyy"));
+                sheetName = now.format(AppConstants.MONTH_YEAR_FORMATTER);
                 logger.info("No sheet specified, defaulting to current month: {}", sheetName);
             }
 
@@ -100,7 +100,7 @@ public class SalarySlipController {
 
             // Generate PDF for each employee
             for (Employee emp : employees) {
-                String pdfPath = uniqueOutputDir + emp.getEmployeeName() + "_SalarySlip.pdf";
+                String pdfPath = uniqueOutputDir + emp.getEmployeeName() + AppConstants.PDF_FILE_SUFFIX;
                 pdfService.generateSalarySlip(emp, pdfPath);
                 logger.info("Generated slip for: {} in directory: {}", emp.getEmployeeName(), uniqueOutputDir);
             }
@@ -108,15 +108,14 @@ public class SalarySlipController {
             // Clean up the temporary file
             Files.deleteIfExists(tempPath);
 
-            String successMessage = String.format("Successfully generated %d salary slips in directory: %s",
-                    employees.size(), uniqueOutputDir);
+            String successMessage = String.format(AppConstants.SUCCESS_MESSAGE_FORMAT, employees.size(), uniqueOutputDir);
             logger.info(successMessage);
 
             return ResponseEntity.ok()
                     .body(new Response(true, successMessage, employees.size()));
 
         } catch (Exception e) {
-            String errorMessage = "Error generating salary slips: " + e.getMessage();
+            String errorMessage = String.format(AppConstants.GENERATE_ERROR_FORMAT, e.getMessage());
             logger.error(errorMessage, e);
             return ResponseEntity.badRequest()
                     .body(new Response(false, errorMessage, 0));
@@ -159,32 +158,28 @@ public class SalarySlipController {
     }
 
     @Schema(description = "API Response Object")
-    private static class Response {
-        @Schema(description = "Indicates if the operation was successful")
-        private final boolean success;
+        private record Response(@Schema(description = "Indicates if the operation was successful") boolean success,
+                                @Schema(description = "Response message with details about the operation") String message,
+                                @Schema(description = "Number of salary slips processed") int count) {
+            private Response(boolean success, String message, int count) {
+                this.success = success;
+                this.message = message;
+                this.count = count;
+            }
 
-        @Schema(description = "Response message with details about the operation")
-        private final String message;
+            @Override
+            public boolean success() {
+                return success;
+            }
 
-        @Schema(description = "Number of salary slips processed")
-        private final int count;
+            @Override
+            public String message() {
+                return message;
+            }
 
-        public Response(boolean success, String message, int count) {
-            this.success = success;
-            this.message = message;
-            this.count = count;
+            @Override
+            public int count() {
+                return count;
+            }
         }
-
-        public boolean isSuccess() {
-            return success;
-        }
-
-        public String getMessage() {
-            return message;
-        }
-
-        public int getCount() {
-            return count;
-        }
-    }
 }

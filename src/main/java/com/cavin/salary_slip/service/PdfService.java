@@ -1,18 +1,23 @@
 package com.cavin.salary_slip.service;
 
+import com.cavin.salary_slip.constants.AppConstants;
 import com.cavin.salary_slip.model.Employee;
 import com.cavin.salary_slip.model.SalaryDetails;
 import com.itextpdf.text.*;
-import com.itextpdf.text.pdf.*;
+import com.itextpdf.text.pdf.PdfPCell;
+import com.itextpdf.text.pdf.PdfPTable;
+import com.itextpdf.text.pdf.PdfWriter;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Service;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.io.FileOutputStream;
 import java.time.LocalDate;
-import java.time.format.DateTimeFormatter;
+
+import static com.cavin.salary_slip.constants.AppConstants.LEFT_SIGNATURE;
+import static com.cavin.salary_slip.constants.AppConstants.RIGHT_SIGNATURE;
 
 @Service
 public class PdfService {
@@ -37,162 +42,152 @@ public class PdfService {
     }
 
     public void generateSalarySlip(Employee emp, String pdfPath) throws Exception {
-        Document document = new Document(PageSize.A4, 20, 20, 20, 20);
+        Document document = new Document(PageSize.A4, AppConstants.PAGE_MARGIN, AppConstants.PAGE_MARGIN,
+                AppConstants.PAGE_MARGIN, AppConstants.PAGE_MARGIN);
         PdfWriter.getInstance(document, new FileOutputStream(pdfPath));
         document.open();
 
         // Create header table with 2 columns
         PdfPTable headerTable = getHeaderTable();
-
-        // Add header table to document
         document.add(headerTable);
 
         // Add spacing after header
-        document.add(new Paragraph("\n"));
+        document.add(new Paragraph(AppConstants.NEW_LINE));
 
         // CIN + Level
-        Paragraph cin = new Paragraph("CIN NO. - U80903BR2022PTC055945",
-                new Font(Font.FontFamily.HELVETICA, 9, Font.BOLD));
+        Paragraph cin = new Paragraph(AppConstants.COMPANY_CIN,
+                new Font(AppConstants.DEFAULT_FONT_FAMILY, AppConstants.FONT_SIZE_NORMAL, Font.BOLD));
         document.add(cin);
 
-        Paragraph level = new Paragraph("Level - 1 (5200 - 20200)\n\n",
-                new Font(Font.FontFamily.HELVETICA, 9, Font.BOLD));
+        Paragraph level = new Paragraph(AppConstants.COMPANY_LEVEL + AppConstants.DOUBLE_NEW_LINE,
+                new Font(AppConstants.DEFAULT_FONT_FAMILY, AppConstants.FONT_SIZE_NORMAL, Font.BOLD));
         document.add(level);
 
         // Employee Info Table
         PdfPTable empTable = getEmpTable(emp);
-
         document.add(empTable);
 
         // Salary Table
-        SalaryDetails salaryDetails = emp.getSalaryDetails();
-        PdfPTable salaryTable = getSalaryTable(salaryDetails);
-
+        PdfPTable salaryTable = getSalaryTable(emp.getSalaryDetails());
         document.add(salaryTable);
 
         // Add some space before signatures
-        document.add(new Paragraph("\n\n"));
+        document.add(new Paragraph(AppConstants.DOUBLE_NEW_LINE));
 
         // Create signature table
         PdfPTable signatureTable = getSignatureTable();
-
         document.add(signatureTable);
 
         document.close();
     }
 
     private PdfPTable getSalaryTable(SalaryDetails salaryDetails) {
-        PdfPTable salaryTable = new PdfPTable(4);
-        salaryTable.setWidthPercentage(100);
-        salaryTable.setSpacingBefore(10f);
+        PdfPTable salaryTable = new PdfPTable(AppConstants.SALARY_TABLE_COLUMNS);
+        salaryTable.setWidthPercentage(AppConstants.TABLE_WIDTH_PERCENTAGE);
+        salaryTable.setSpacingBefore(AppConstants.SPACING_AFTER_HEADER);
 
-        salaryTable.addCell(getHeaderCell("Earning (Rs.)"));
-        salaryTable.addCell(getHeaderCell(""));
-        salaryTable.addCell(getHeaderCell("Deductions (Rs.)"));
-        salaryTable.addCell(getHeaderCell(""));
+        salaryTable.addCell(getHeaderCell(AppConstants.EARNINGS_HEADER));
+        salaryTable.addCell(getHeaderCell(AppConstants.EMPTY_HEADER));
+        salaryTable.addCell(getHeaderCell(AppConstants.DEDUCTIONS_HEADER));
+        salaryTable.addCell(getHeaderCell(AppConstants.EMPTY_HEADER));
 
         // Earnings
-        salaryTable.addCell(getCell("Basic", PdfPCell.ALIGN_LEFT, false));
+        salaryTable.addCell(getCell(AppConstants.BASIC_LABEL, PdfPCell.ALIGN_LEFT, false));
         salaryTable.addCell(getCell(String.valueOf(salaryDetails.getBasic()), PdfPCell.ALIGN_RIGHT, false));
-
-        salaryTable.addCell(getCell("Income Tax (TDS)", PdfPCell.ALIGN_LEFT, false));
+        salaryTable.addCell(getCell(AppConstants.INCOME_TAX_LABEL, PdfPCell.ALIGN_LEFT, false));
         salaryTable.addCell(getCell(String.valueOf(salaryDetails.getIncomeTax()), PdfPCell.ALIGN_RIGHT, false));
 
-        salaryTable.addCell(getCell("House Rent Allowance", PdfPCell.ALIGN_LEFT, false));
+        salaryTable.addCell(getCell(AppConstants.HRA_LABEL, PdfPCell.ALIGN_LEFT, false));
         salaryTable.addCell(getCell(String.valueOf(salaryDetails.getHra()), PdfPCell.ALIGN_RIGHT, false));
-
-        salaryTable.addCell(getCell("EPF Deduction", PdfPCell.ALIGN_LEFT, false));
+        salaryTable.addCell(getCell(AppConstants.EPF_LABEL, PdfPCell.ALIGN_LEFT, false));
         salaryTable.addCell(getCell(String.valueOf(salaryDetails.getEpf()), PdfPCell.ALIGN_RIGHT, false));
 
-        salaryTable.addCell(getCell("Dearness Allowance", PdfPCell.ALIGN_LEFT, false));
+        salaryTable.addCell(getCell(AppConstants.DA_LABEL, PdfPCell.ALIGN_LEFT, false));
         salaryTable.addCell(getCell(String.valueOf(salaryDetails.getDa()), PdfPCell.ALIGN_RIGHT, false));
-
-        salaryTable.addCell(getCell("Leave Deduction", PdfPCell.ALIGN_LEFT, false));
+        salaryTable.addCell(getCell(AppConstants.LEAVE_DEDUCTION_LABEL, PdfPCell.ALIGN_LEFT, false));
         salaryTable.addCell(getCell(String.valueOf(salaryDetails.getLeaveDeduction()), PdfPCell.ALIGN_RIGHT, false));
 
-        salaryTable.addCell(getCell("Special Allowance", PdfPCell.ALIGN_LEFT, false));
+        salaryTable.addCell(getCell(AppConstants.SPECIAL_ALLOWANCE_LABEL, PdfPCell.ALIGN_LEFT, false));
         salaryTable.addCell(getCell(String.valueOf(salaryDetails.getSpecialAllowance()), PdfPCell.ALIGN_RIGHT, false));
+        salaryTable.addCell(getCell(AppConstants.EMPTY_HEADER, PdfPCell.ALIGN_LEFT, false));
+        salaryTable.addCell(getCell(AppConstants.EMPTY_HEADER, PdfPCell.ALIGN_RIGHT, false));
 
-        salaryTable.addCell(getCell("", PdfPCell.ALIGN_LEFT, false));
-        salaryTable.addCell(getCell("", PdfPCell.ALIGN_RIGHT, false));
-
-        salaryTable.addCell(getCell("Travelling Allowance", PdfPCell.ALIGN_LEFT, false));
+        salaryTable.addCell(getCell(AppConstants.TRAVEL_ALLOWANCE_LABEL, PdfPCell.ALIGN_LEFT, false));
         salaryTable.addCell(getCell(String.valueOf(salaryDetails.getTravellingAllowance()), PdfPCell.ALIGN_RIGHT, false));
-
-        salaryTable.addCell(getCell("", PdfPCell.ALIGN_LEFT, false));
-        salaryTable.addCell(getCell("", PdfPCell.ALIGN_RIGHT, false));
+        salaryTable.addCell(getCell(AppConstants.EMPTY_HEADER, PdfPCell.ALIGN_LEFT, false));
+        salaryTable.addCell(getCell(AppConstants.EMPTY_HEADER, PdfPCell.ALIGN_RIGHT, false));
 
         // Totals
-        salaryTable.addCell(getCell("Total Earning", PdfPCell.ALIGN_LEFT, true));
-        salaryTable.addCell(getCell(String.valueOf(salaryDetails.getTotalEarnings()), PdfPCell.ALIGN_RIGHT, true));
+        salaryTable.addCell(getCell(AppConstants.TOTAL_EARNING_LABEL, AppConstants.DEFAULT_CELL_ALIGN_LEFT, true));
+        salaryTable.addCell(getCell(String.valueOf(salaryDetails.getTotalEarnings()), AppConstants.DEFAULT_CELL_ALIGN_RIGHT, true));
 
-        salaryTable.addCell(getCell("Total Deduction", PdfPCell.ALIGN_LEFT, true));
-        salaryTable.addCell(getCell(String.valueOf(salaryDetails.getTotalDeductions()), PdfPCell.ALIGN_RIGHT, true));
+        salaryTable.addCell(getCell(AppConstants.TOTAL_DEDUCTION_LABEL, AppConstants.DEFAULT_CELL_ALIGN_LEFT, true));
+        salaryTable.addCell(getCell(String.valueOf(salaryDetails.getTotalDeductions()), AppConstants.DEFAULT_CELL_ALIGN_RIGHT, true));
 
-        salaryTable.addCell(getCell("Net Salary", PdfPCell.ALIGN_LEFT, true));
-        salaryTable.addCell(getCell(String.valueOf(salaryDetails.getNetSalary()), PdfPCell.ALIGN_RIGHT, true));
-        salaryTable.addCell(getCell("", PdfPCell.ALIGN_LEFT, false));
-        salaryTable.addCell(getCell("", PdfPCell.ALIGN_LEFT, false));
+        salaryTable.addCell(getCell(AppConstants.NET_SALARY_LABEL, AppConstants.DEFAULT_CELL_ALIGN_LEFT, true));
+        salaryTable.addCell(getCell(String.valueOf(salaryDetails.getNetSalary()), AppConstants.DEFAULT_CELL_ALIGN_RIGHT, true));
+        salaryTable.addCell(getCell(AppConstants.LABEL_EMPTY, AppConstants.DEFAULT_CELL_ALIGN_LEFT, false));
+        salaryTable.addCell(getCell(AppConstants.LABEL_EMPTY, AppConstants.DEFAULT_CELL_ALIGN_LEFT, false));
+
         return salaryTable;
     }
 
     private PdfPTable getEmpTable(Employee emp) {
-        PdfPTable empTable = new PdfPTable(4);
-        empTable.setWidthPercentage(100);
-        empTable.setSpacingBefore(5f);
-        empTable.setSpacingAfter(5f);
+        PdfPTable empTable = new PdfPTable(AppConstants.EMP_TABLE_COLUMNS);
+        empTable.setWidthPercentage(AppConstants.TABLE_WIDTH_PERCENTAGE);
+        empTable.setSpacingBefore(AppConstants.TABLE_SPACING_BEFORE);
+        empTable.setSpacingAfter(AppConstants.TABLE_SPACING_AFTER);
 
-        empTable.addCell(getCell("Emp. - Id", PdfPCell.ALIGN_LEFT, true));
+        empTable.addCell(getCell(AppConstants.LABEL_EMP_ID, PdfPCell.ALIGN_LEFT, true));
         empTable.addCell(getCell(emp.getEmpId(), PdfPCell.ALIGN_LEFT, false));
-        empTable.addCell(getCell("Payable Days", PdfPCell.ALIGN_LEFT, true));
+        empTable.addCell(getCell(AppConstants.LABEL_PAYABLE_DAYS, PdfPCell.ALIGN_LEFT, true));
         empTable.addCell(getCell(String.valueOf(emp.getPayableDays()), PdfPCell.ALIGN_LEFT, false));
 
-        empTable.addCell(getCell("Name", PdfPCell.ALIGN_LEFT, true));
+        empTable.addCell(getCell(AppConstants.LABEL_NAME, PdfPCell.ALIGN_LEFT, true));
         empTable.addCell(getCell(emp.getEmployeeName(), PdfPCell.ALIGN_LEFT, false));
-        empTable.addCell(getCell("Month/Year", PdfPCell.ALIGN_LEFT, true));
+        empTable.addCell(getCell(AppConstants.LABEL_MONTH_YEAR, PdfPCell.ALIGN_LEFT, true));
         empTable.addCell(getCell(formatSalaryMonth(emp.getSalaryDate()), PdfPCell.ALIGN_LEFT, false));
 
-        empTable.addCell(getCell("Designation", PdfPCell.ALIGN_LEFT, true));
+        empTable.addCell(getCell(AppConstants.LABEL_DESIGNATION, PdfPCell.ALIGN_LEFT, true));
         empTable.addCell(getCell(emp.getDesignation(), PdfPCell.ALIGN_LEFT, false));
-        empTable.addCell(getCell("Pan No.", PdfPCell.ALIGN_LEFT, true));
+        empTable.addCell(getCell(AppConstants.LABEL_PAN, PdfPCell.ALIGN_LEFT, true));
         empTable.addCell(getCell(emp.getPanNo(), PdfPCell.ALIGN_LEFT, false));
 
-        empTable.addCell(getCell("Bank Account No", PdfPCell.ALIGN_LEFT, true));
+        empTable.addCell(getCell(AppConstants.LABEL_BANK_ACCOUNT, PdfPCell.ALIGN_LEFT, true));
         empTable.addCell(getCell(emp.getBankAccountNo(), PdfPCell.ALIGN_LEFT, false));
-        empTable.addCell(getCell("Aadhar No", PdfPCell.ALIGN_LEFT, true));
+        empTable.addCell(getCell(AppConstants.LABEL_AADHAR, PdfPCell.ALIGN_LEFT, true));
         empTable.addCell(getCell(emp.getAadharNo(), PdfPCell.ALIGN_LEFT, false));
 
-        empTable.addCell(getCell("IFSC Code", PdfPCell.ALIGN_LEFT, true));
+        empTable.addCell(getCell(AppConstants.LABEL_IFSC, PdfPCell.ALIGN_LEFT, true));
         empTable.addCell(getCell(emp.getIfscCode(), PdfPCell.ALIGN_LEFT, false));
-        empTable.addCell(getCell("", PdfPCell.ALIGN_LEFT, true));
-        empTable.addCell(getCell("", PdfPCell.ALIGN_LEFT, false));
+        empTable.addCell(getCell(AppConstants.LABEL_EMPTY, PdfPCell.ALIGN_LEFT, true));
+        empTable.addCell(getCell(AppConstants.LABEL_EMPTY, PdfPCell.ALIGN_LEFT, false));
 
-        empTable.addCell(getCell("UAN No.", PdfPCell.ALIGN_LEFT, true));
+        empTable.addCell(getCell(AppConstants.LABEL_UAN, PdfPCell.ALIGN_LEFT, true));
         empTable.addCell(getCell(emp.getUanNo(), PdfPCell.ALIGN_LEFT, false));
-        empTable.addCell(getCell("", PdfPCell.ALIGN_LEFT, true));
-        empTable.addCell(getCell("", PdfPCell.ALIGN_LEFT, false));
+        empTable.addCell(getCell(AppConstants.LABEL_EMPTY, PdfPCell.ALIGN_LEFT, true));
+        empTable.addCell(getCell(AppConstants.LABEL_EMPTY, PdfPCell.ALIGN_LEFT, false));
+
         return empTable;
     }
 
-    private static PdfPTable getSignatureTable() {
+    private PdfPTable getSignatureTable() {
         PdfPTable signatureTable = new PdfPTable(2);
-        signatureTable.setWidthPercentage(100);
-        signatureTable.setSpacingBefore(30f); // Space for actual signatures
+        signatureTable.setWidthPercentage(AppConstants.TABLE_WIDTH_PERCENTAGE);
+        signatureTable.setSpacingBefore(30f);
 
         // Create signature cells
         PdfPCell leftSignature = new PdfPCell();
         leftSignature.setBorder(Rectangle.TOP);
         leftSignature.setPaddingTop(30f); // Space for manual signature
-        Paragraph srManager = new Paragraph("SR. Manager Finance & Accounting",
-            new Font(Font.FontFamily.HELVETICA, 10));
+        Paragraph srManager = new Paragraph(LEFT_SIGNATURE, new Font(Font.FontFamily.HELVETICA, 10));
         srManager.setAlignment(Element.ALIGN_CENTER);
         leftSignature.addElement(srManager);
 
         PdfPCell rightSignature = new PdfPCell();
         rightSignature.setBorder(Rectangle.TOP);
         rightSignature.setPaddingTop(30f); // Space for manual signature
-        Paragraph director = new Paragraph("Director Finance",
-            new Font(Font.FontFamily.HELVETICA, 10));
+        Paragraph director = new Paragraph(RIGHT_SIGNATURE, new Font(Font.FontFamily.HELVETICA, 10));
         director.setAlignment(Element.ALIGN_CENTER);
         rightSignature.addElement(director);
 
@@ -202,23 +197,23 @@ public class PdfService {
     }
 
     private PdfPTable getHeaderTable() throws DocumentException {
-        PdfPTable headerTable = new PdfPTable(2);
-        headerTable.setWidthPercentage(100);
-        headerTable.setWidths(new float[]{80, 20}); // 80% for text, 20% for logo
+        PdfPTable headerTable = new PdfPTable(AppConstants.HEADER_TABLE_COLUMNS);
+        headerTable.setWidthPercentage(AppConstants.TABLE_WIDTH_PERCENTAGE);
+        headerTable.setWidths(AppConstants.HEADER_TABLE_COLUMN_WIDTHS);
 
         // Left cell for company details
         PdfPCell leftCell = getParagraphCell();
 
         // Right cell for logo
         PdfPCell rightCell = new PdfPCell();
-        rightCell.setBorder(Rectangle.NO_BORDER);
-        rightCell.setVerticalAlignment(Element.ALIGN_MIDDLE);
+        rightCell.setBorder(AppConstants.NO_BORDER);
+        rightCell.setVerticalAlignment(AppConstants.DEFAULT_CELL_VERTICAL_ALIGN);
 
         // Add logo to right cell
         Image logo = getLogoImage();
         if (logo != null) {
-            logo.scaleToFit(100, 80); // Adjusted height to match 4 lines
-            logo.setAlignment(Element.ALIGN_CENTER);
+            logo.scaleToFit(AppConstants.LOGO_MAX_WIDTH, AppConstants.LOGO_MAX_HEIGHT);
+            logo.setAlignment(AppConstants.DEFAULT_CELL_ALIGN_CENTER);
             rightCell.addElement(logo);
         }
 
@@ -230,45 +225,46 @@ public class PdfService {
 
     private static PdfPCell getParagraphCell() {
         PdfPCell leftCell = new PdfPCell();
-        leftCell.setBorder(Rectangle.NO_BORDER);
+        leftCell.setBorder(AppConstants.NO_BORDER);
 
         // Add title and company details to left cell
-        Paragraph title = new Paragraph("Pay Slip", new Font(Font.FontFamily.HELVETICA, 12, Font.BOLD));
-        title.setAlignment(Element.ALIGN_CENTER);
+        Paragraph title = new Paragraph(AppConstants.PDF_TITLE,
+                new Font(AppConstants.DEFAULT_FONT_FAMILY, AppConstants.FONT_SIZE_HEADER, Font.BOLD));
+        title.setAlignment(AppConstants.DEFAULT_CELL_ALIGN_CENTER);
         leftCell.addElement(title);
 
-        Paragraph company = new Paragraph("NK STOCK TALK PVT LTD",
-                new Font(Font.FontFamily.HELVETICA, 12, Font.BOLD));
-        company.setAlignment(Element.ALIGN_CENTER);
+        Paragraph company = new Paragraph(AppConstants.COMPANY_NAME,
+                new Font(AppConstants.DEFAULT_FONT_FAMILY, AppConstants.FONT_SIZE_HEADER, Font.BOLD));
+        company.setAlignment(AppConstants.DEFAULT_CELL_ALIGN_CENTER);
         leftCell.addElement(company);
 
-        Paragraph address1 = new Paragraph("Rupaspur Ara Garden, Manglam Vihar Colony",
-                new Font(Font.FontFamily.HELVETICA, 12, Font.BOLD));
-        address1.setAlignment(Element.ALIGN_CENTER);
+        Paragraph address1 = new Paragraph(AppConstants.COMPANY_ADDRESS_LINE1,
+                new Font(AppConstants.DEFAULT_FONT_FAMILY, AppConstants.FONT_SIZE_HEADER, Font.BOLD));
+        address1.setAlignment(AppConstants.DEFAULT_CELL_ALIGN_CENTER);
         leftCell.addElement(address1);
 
-        Paragraph address2 = new Paragraph("B.V College, Patna - 800014",
-                new Font(Font.FontFamily.HELVETICA, 12, Font.BOLD));
-        address2.setAlignment(Element.ALIGN_CENTER);
+        Paragraph address2 = new Paragraph(AppConstants.COMPANY_ADDRESS_LINE2,
+                new Font(AppConstants.DEFAULT_FONT_FAMILY, AppConstants.FONT_SIZE_HEADER, Font.BOLD));
+        address2.setAlignment(AppConstants.DEFAULT_CELL_ALIGN_CENTER);
         leftCell.addElement(address2);
         return leftCell;
     }
 
     private PdfPCell getCell(String text, int alignment, boolean bold) {
-        Font font = bold ? new Font(Font.FontFamily.HELVETICA, 9, Font.BOLD) :
-                new Font(Font.FontFamily.HELVETICA, 9);
+        Font font = bold ? new Font(AppConstants.DEFAULT_FONT_FAMILY, AppConstants.FONT_SIZE_NORMAL, Font.BOLD) :
+                new Font(AppConstants.DEFAULT_FONT_FAMILY, AppConstants.FONT_SIZE_NORMAL);
         PdfPCell cell = new PdfPCell(new Phrase(text, font));
         cell.setHorizontalAlignment(alignment);
-        cell.setPadding(5f);
+        cell.setPadding(AppConstants.CELL_PADDING);
         return cell;
     }
 
     private PdfPCell getHeaderCell(String text) {
-        Font font = new Font(Font.FontFamily.HELVETICA, 10, Font.BOLD);
+        Font font = new Font(AppConstants.DEFAULT_FONT_FAMILY, AppConstants.FONT_SIZE_HEADER, Font.BOLD);
         PdfPCell cell = new PdfPCell(new Phrase(text, font));
-        cell.setHorizontalAlignment(Element.ALIGN_CENTER);
-        cell.setBackgroundColor(BaseColor.LIGHT_GRAY);
-        cell.setPadding(6f);
+        cell.setHorizontalAlignment(AppConstants.DEFAULT_CELL_ALIGN_CENTER);
+        cell.setBackgroundColor(AppConstants.HEADER_CELL_BG_COLOR);
+        cell.setPadding(AppConstants.HEADER_CELL_PADDING);
         return cell;
     }
 
@@ -277,6 +273,6 @@ public class PdfService {
             date = LocalDate.now();
         }
         LocalDate lastDay = date.withDayOfMonth(date.lengthOfMonth());
-        return lastDay.format(DateTimeFormatter.ofPattern("dd/MM/yyyy"));
+        return lastDay.format(AppConstants.SALARY_DATE_FORMATTER);
     }
 }
