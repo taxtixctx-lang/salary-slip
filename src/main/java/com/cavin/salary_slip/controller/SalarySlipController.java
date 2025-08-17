@@ -16,7 +16,10 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.File;
@@ -132,7 +135,7 @@ public class SalarySlipController {
                     content = @Content(mediaType = "application/json",
                             schema = @Schema(implementation = Response.class)))
     })
-    @GetMapping(value = "/sheets", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PostMapping(value = "/sheets", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<?> getSheetNames(
             @Parameter(description = "Excel file to read sheet names from", required = true)
             @RequestParam("file") MultipartFile excelFile) {
@@ -158,28 +161,28 @@ public class SalarySlipController {
     }
 
     @Schema(description = "API Response Object")
-        private record Response(@Schema(description = "Indicates if the operation was successful") boolean success,
-                                @Schema(description = "Response message with details about the operation") String message,
-                                @Schema(description = "Number of salary slips processed") int count) {
-            private Response(boolean success, String message, int count) {
-                this.success = success;
-                this.message = message;
-                this.count = count;
-            }
-
-            @Override
-            public boolean success() {
-                return success;
-            }
-
-            @Override
-            public String message() {
-                return message;
-            }
-
-            @Override
-            public int count() {
-                return count;
-            }
+    private record Response(@Schema(description = "Indicates if the operation was successful") boolean success,
+                            @Schema(description = "Response message with details about the operation") String message,
+                            @Schema(description = "Number of salary slips processed") int count) {
+        private Response(boolean success, String message, int count) {
+            this.success = success;
+            this.message = message;
+            this.count = count;
         }
+
+        @Override
+        public boolean success() {
+            return success;
+        }
+
+        @Override
+        public String message() {
+            return message;
+        }
+
+        @Override
+        public int count() {
+            return count;
+        }
+    }
 }
