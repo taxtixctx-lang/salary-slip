@@ -7,14 +7,20 @@ import com.itextpdf.text.*;
 import com.itextpdf.text.pdf.PdfPCell;
 import com.itextpdf.text.pdf.PdfPTable;
 import com.itextpdf.text.pdf.PdfWriter;
+import jakarta.annotation.PostConstruct;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.ClassPathResource;
+import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import org.springframework.stereotype.Service;
 
 import java.io.FileOutputStream;
 import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Future;
 
 import static com.cavin.salary_slip.constants.AppConstants.LEFT_SIGNATURE;
 import static com.cavin.salary_slip.constants.AppConstants.RIGHT_SIGNATURE;
@@ -26,14 +32,25 @@ public class PdfService {
     @Value("${salary.slip.logo.path:static/img.png}")
     private String logoPath;
 
-    private Image getLogoImage() {
+    private final ThreadPoolTaskExecutor pdfGeneratorExecutor;
+    private Image logoImage;
+
+    public PdfService(ThreadPoolTaskExecutor pdfGeneratorExecutor) {
+        this.pdfGeneratorExecutor = pdfGeneratorExecutor;
+    }
+
+    @PostConstruct
+    public void init() {
+        // Load logo image once during initialization
+        this.logoImage = loadLogoImage();
+    }
+
+    private Image loadLogoImage() {
         try {
-            // Try to load from classpath resources first
             ClassPathResource resource = new ClassPathResource(logoPath);
             if (resource.exists()) {
                 return Image.getInstance(resource.getInputStream().readAllBytes());
             }
-            // Fallback to file system if resource doesn't exist
             return Image.getInstance(logoPath);
         } catch (Exception e) {
             logger.warn("Could not load logo image from path: {}. Using text header instead.", logoPath, e);
@@ -41,44 +58,89 @@ public class PdfService {
         }
     }
 
-    public void generateSalarySlip(Employee emp, String pdfPath) throws Exception {
-        Document document = new Document(PageSize.A4, AppConstants.PAGE_MARGIN, AppConstants.PAGE_MARGIN,
-                AppConstants.PAGE_MARGIN, AppConstants.PAGE_MARGIN);
-        PdfWriter.getInstance(document, new FileOutputStream(pdfPath));
-        document.open();
+    public Future<List<String>> generateSalarySlipsInBatch(List<Employee> employees, String outputDir) {
+        return CompletableFuture.supplyAsync(() -> {
+            List<String> generatedFiles = new ArrayList<>();
+            List<CompletableFuture<String>> futures = new ArrayList<>();
 
-        // Create header table with 2 columns
+            for (Employee emp : employees) {
+                CompletableFuture<String> future = CompletableFuture.supplyAsync(() -> {
+                    try {
+                        String pdfPath = outputDir + emp.getEmpId() + "_" +
+                                emp.getSalaryDate().format(AppConstants.MONTH_YEAR_FORMATTER) +
+                                AppConstants.PDF_FILE_SUFFIX;
+                        generateSalarySlip(emp, pdfPath);
+                        return pdfPath;
+                    } catch (Exception e) {
+                        logger.error("Error generating PDF for employee {}: {}", emp.getEmpId(), e.getMessage());
+                        throw new RuntimeException(e);
+                    }
+                }, pdfGeneratorExecutor);
+                futures.add(future);
+            }
+
+            // Wait for all PDFs to be generated
+            CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])).join();
+
+            // Collect results
+            for (CompletableFuture<String> future : futures) {
+                try {
+                    generatedFiles.add(future.get());
+                } catch (Exception e) {
+                    logger.error("Error collecting generated PDF path: {}", e.getMessage());
+                }
+            }
+
+            return generatedFiles;
+        }, pdfGeneratorExecutor);
+    }
+
+    // Existing methods with memory optimizations
+    public void generateSalarySlip(Employee emp, String pdfPath) throws Exception {
+        Document document = null;
+        try {
+            document = new Document(PageSize.A4, AppConstants.PAGE_MARGIN, AppConstants.PAGE_MARGIN,
+                    AppConstants.PAGE_MARGIN, AppConstants.PAGE_MARGIN);
+            PdfWriter.getInstance(document, new FileOutputStream(pdfPath));
+            document.open();
+
+            // Use pre-loaded logo image
+            addHeaderSection(document);
+            addCompanyInfo(document);
+            addEmployeeDetails(document, emp);
+            addSalaryDetails(document, emp.getSalaryDetails());
+            addSignatureSection(document);
+
+        } finally {
+            if (document != null && document.isOpen()) {
+                document.close();
+            }
+        }
+    }
+
+    private void addHeaderSection(Document document) throws Exception {
         PdfPTable headerTable = getHeaderTable();
         document.add(headerTable);
-
-        // Add spacing after header
         document.add(new Paragraph(AppConstants.NEW_LINE));
+    }
 
-        // CIN + Level
-        Paragraph cin = new Paragraph(AppConstants.COMPANY_CIN,
-                new Font(AppConstants.DEFAULT_FONT_FAMILY, AppConstants.FONT_SIZE_NORMAL, Font.BOLD));
-        document.add(cin);
+    private void addCompanyInfo(Document document) throws Exception {
+        Font normalBold = new Font(AppConstants.DEFAULT_FONT_FAMILY, AppConstants.FONT_SIZE_NORMAL, Font.BOLD);
+        document.add(new Paragraph(AppConstants.COMPANY_CIN, normalBold));
+        document.add(new Paragraph(AppConstants.COMPANY_LEVEL + AppConstants.DOUBLE_NEW_LINE, normalBold));
+    }
 
-        Paragraph level = new Paragraph(AppConstants.COMPANY_LEVEL + AppConstants.DOUBLE_NEW_LINE,
-                new Font(AppConstants.DEFAULT_FONT_FAMILY, AppConstants.FONT_SIZE_NORMAL, Font.BOLD));
-        document.add(level);
+    private void addEmployeeDetails(Document document, Employee emp) throws Exception {
+        document.add(getEmpTable(emp));
+    }
 
-        // Employee Info Table
-        PdfPTable empTable = getEmpTable(emp);
-        document.add(empTable);
-
-        // Salary Table
-        PdfPTable salaryTable = getSalaryTable(emp.getSalaryDetails());
-        document.add(salaryTable);
-
-        // Add some space before signatures
+    private void addSalaryDetails(Document document, SalaryDetails salaryDetails) throws Exception {
+        document.add(getSalaryTable(salaryDetails));
         document.add(new Paragraph(AppConstants.DOUBLE_NEW_LINE));
+    }
 
-        // Create signature table
-        PdfPTable signatureTable = getSignatureTable();
-        document.add(signatureTable);
-
-        document.close();
+    private void addSignatureSection(Document document) throws Exception {
+        document.add(getSignatureTable());
     }
 
     private PdfPTable getSalaryTable(SalaryDetails salaryDetails) {
@@ -210,7 +272,7 @@ public class PdfService {
         rightCell.setVerticalAlignment(AppConstants.DEFAULT_CELL_VERTICAL_ALIGN);
 
         // Add logo to right cell
-        Image logo = getLogoImage();
+        Image logo = logoImage;
         if (logo != null) {
             logo.scaleToFit(AppConstants.LOGO_MAX_WIDTH, AppConstants.LOGO_MAX_HEIGHT);
             logo.setAlignment(AppConstants.DEFAULT_CELL_ALIGN_CENTER);

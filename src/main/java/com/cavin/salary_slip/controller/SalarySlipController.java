@@ -1,7 +1,6 @@
 package com.cavin.salary_slip.controller;
 
 import com.cavin.salary_slip.constants.AppConstants;
-import com.cavin.salary_slip.model.Employee;
 import com.cavin.salary_slip.service.ExcelReaderService;
 import com.cavin.salary_slip.service.PdfService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -24,6 +23,8 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.concurrent.Future;
+import java.util.concurrent.atomic.AtomicInteger;
 
 @RestController
 @RequestMapping("/api/salary-slip")
@@ -44,7 +45,7 @@ public class SalarySlipController {
     }
 
     @Operation(summary = "Generate salary slips from Excel file",
-            description = "Upload an Excel file containing employee salary data and generate PDF salary slips")
+            description = "Upload an Excel file containing employee salary data and generate PDF salary slips. Optimized for large files.")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Successfully generated salary slips",
                     content = @Content(mediaType = "application/json",
@@ -88,31 +89,35 @@ public class SalarySlipController {
                 logger.info("No sheet specified, defaulting to current month: {}", sheetName);
             }
 
-            // Try to read from specified sheet, fall back to first sheet if not found
-            List<Employee> employees;
-            try {
-                employees = excelReaderService.readEmployeesFromExcel(tempPath.toString(), sheetName);
-                logger.info("Reading from sheet: {}", sheetName);
-            } catch (IllegalArgumentException e) {
-                employees = excelReaderService.readEmployeesFromExcel(tempPath.toString());
-                logger.warn("Sheet {} not found, using default sheet", sheetName);
-            }
+            final AtomicInteger processedCount = new AtomicInteger(0);
+            final String finalSheetName = sheetName;
+            final String finalOutputDir = uniqueOutputDir;
 
-            // Generate PDF for each employee
-            for (Employee emp : employees) {
-                String pdfPath = uniqueOutputDir + emp.getEmployeeName() + AppConstants.PDF_FILE_SUFFIX;
-                pdfService.generateSalarySlip(emp, pdfPath);
-                logger.info("Generated slip for: {} in directory: {}", emp.getEmployeeName(), uniqueOutputDir);
-            }
+            // Process the Excel file in batches
+            excelReaderService.processEmployeesInBatches(
+                    tempPath.toString(),
+                    finalSheetName,
+                    batch -> {
+                        try {
+                            Future<List<String>> batchResult = pdfService.generateSalarySlipsInBatch(batch, finalOutputDir);
+                            processedCount.addAndGet(batch.size());
+                            logger.info("Processed batch of {} employees. Total processed: {}",
+                                    batch.size(), processedCount.get());
+                        } catch (Exception e) {
+                            logger.error("Error processing batch: {}", e.getMessage(), e);
+                        }
+                    }
+            );
 
             // Clean up the temporary file
             Files.deleteIfExists(tempPath);
 
-            String successMessage = String.format(AppConstants.SUCCESS_MESSAGE_FORMAT, employees.size(), uniqueOutputDir);
+            String successMessage = String.format(AppConstants.SUCCESS_MESSAGE_FORMAT,
+                    processedCount.get(), uniqueOutputDir);
             logger.info(successMessage);
 
             return ResponseEntity.ok()
-                    .body(new Response(true, successMessage, employees.size()));
+                    .body(new Response(true, successMessage, processedCount.get()));
 
         } catch (Exception e) {
             String errorMessage = String.format(AppConstants.GENERATE_ERROR_FORMAT, e.getMessage());
@@ -158,28 +163,28 @@ public class SalarySlipController {
     }
 
     @Schema(description = "API Response Object")
-        private record Response(@Schema(description = "Indicates if the operation was successful") boolean success,
-                                @Schema(description = "Response message with details about the operation") String message,
-                                @Schema(description = "Number of salary slips processed") int count) {
-            private Response(boolean success, String message, int count) {
-                this.success = success;
-                this.message = message;
-                this.count = count;
-            }
-
-            @Override
-            public boolean success() {
-                return success;
-            }
-
-            @Override
-            public String message() {
-                return message;
-            }
-
-            @Override
-            public int count() {
-                return count;
-            }
+    private record Response(@Schema(description = "Indicates if the operation was successful") boolean success,
+                            @Schema(description = "Response message with details about the operation") String message,
+                            @Schema(description = "Number of salary slips processed") int count) {
+        private Response(boolean success, String message, int count) {
+            this.success = success;
+            this.message = message;
+            this.count = count;
         }
+
+        @Override
+        public boolean success() {
+            return success;
+        }
+
+        @Override
+        public String message() {
+            return message;
+        }
+
+        @Override
+        public int count() {
+            return count;
+        }
+    }
 }
