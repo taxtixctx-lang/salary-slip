@@ -32,17 +32,28 @@ public class SalarySlipScheduler {
     @Value("${salary.slip.scheduler.cron}")
     private String schedulerCron;
 
+    @Value("${salary.slip.scheduler.enabled:true}")
+    private boolean schedulerEnabled;
+
+    @Value("${salary.slip.generate.on.startup:false}")
+    private boolean generateOnStartup;
+
     public SalarySlipScheduler(ExcelReaderService excelReaderService, PdfService pdfService) {
         this.excelReaderService = excelReaderService;
         this.pdfService = pdfService;
     }
 
     /**
-     * Runs every day at 10 AM
+     * Runs every day at 10 AM if scheduler is enabled
      * Cron format: second minute hour day month weekday
      */
     @Scheduled(cron = "${salary.slip.scheduler.cron}")
     public void generateSalarySlips() {
+        if (!schedulerEnabled) {
+            logger.info("Scheduler is disabled. Skipping salary slip generation.");
+            return;
+        }
+
         try {
             // Create unique output directory with timestamp
             LocalDateTime now = LocalDateTime.now();
@@ -87,7 +98,15 @@ public class SalarySlipScheduler {
 
     @PostConstruct
     public void onStartup() {
-        logger.info("Running salary slip generation on startup...");
-        generateSalarySlips();
+        if (schedulerEnabled) {
+            logger.info("Scheduler is enabled. Will run according to schedule: {}", schedulerCron);
+            if (generateOnStartup) {
+                logger.info("Running salary slip generation on startup...");
+                generateSalarySlips();
+            }
+        } else {
+            logger.info("Scheduler is disabled. Will not run automatically.");
+        }
     }
+
 }
