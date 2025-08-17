@@ -4,6 +4,7 @@ import com.cavin.salary_slip.model.Employee;
 import com.cavin.salary_slip.model.SalaryDetails;
 import org.apache.poi.ss.usermodel.*;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.io.FileInputStream;
@@ -16,9 +17,12 @@ import java.util.List;
 @Service
 public class ExcelReaderService {
 
-    // Read from default sheet (first sheet)
+    @Value("${salary.slip.excel.sheet.name}")
+    private String currentMonthSheet;
+
+    // Read from default sheet (using configured sheet name)
     public List<Employee> readEmployeesFromExcel(String filePath) {
-        return readEmployeesFromExcel(filePath, 0);
+        return readEmployeesFromExcel(filePath, currentMonthSheet);
     }
 
     // Read from specific sheet by index

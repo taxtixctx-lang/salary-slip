@@ -243,12 +243,12 @@ public class PdfService {
         leftCell.addElement(company);
 
         Paragraph address1 = new Paragraph("Rupaspur Ara Garden, Manglam Vihar Colony",
-                new Font(Font.FontFamily.HELVETICA, 10));
+                new Font(Font.FontFamily.HELVETICA, 12, Font.BOLD));
         address1.setAlignment(Element.ALIGN_CENTER);
         leftCell.addElement(address1);
 
         Paragraph address2 = new Paragraph("B.V College, Patna - 800014",
-                new Font(Font.FontFamily.HELVETICA, 10));
+                new Font(Font.FontFamily.HELVETICA, 12, Font.BOLD));
         address2.setAlignment(Element.ALIGN_CENTER);
         leftCell.addElement(address2);
         return leftCell;
