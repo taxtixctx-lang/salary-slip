@@ -50,7 +50,7 @@ public final class AppConstants {
     // Company Details Constants
     public static final String COMPANY_NAME = "AVETA IVF";
     public static final String COMPANY_ADDRESS_LINE1 = "Rupaspur Ara Garden, Manglam Vihar Colony";
-    public static final String COMPANY_ADDRESS_LINE2 = "B.V College, Patna - 800014";
+    public static final String COMPANY_ADDRESS_LINE2 = "Near Bansal Hospital, Patna, Bihar - 801503";
     public static final String PDF_TITLE = "Pay Slip";
 
     // Employee Table Labels

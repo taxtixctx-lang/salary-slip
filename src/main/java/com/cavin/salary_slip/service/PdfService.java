@@ -67,7 +67,6 @@ public class PdfService {
         if (!companyCin.isEmpty()) {
             Paragraph cin = new Paragraph(companyCin,
                     new Font(AppConstants.DEFAULT_FONT_FAMILY, AppConstants.FONT_SIZE_NORMAL, Font.BOLD));
-            cin.setAlignment(AppConstants.DEFAULT_CELL_ALIGN_CENTER);
             document.add(cin);
         }
 
