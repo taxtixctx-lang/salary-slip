@@ -1,6 +1,7 @@
 package com.cavin.salary_slip.service;
 
 import com.cavin.salary_slip.constants.AppConstants;
+import com.cavin.salary_slip.model.CompanyDetails;
 import com.cavin.salary_slip.model.Employee;
 import com.cavin.salary_slip.model.SalaryDetails;
 import com.itextpdf.text.*;
@@ -12,6 +13,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Service;
+import org.springframework.util.StringUtils;
 
 import java.io.FileOutputStream;
 import java.time.LocalDate;
@@ -25,6 +27,12 @@ public class PdfService {
 
     @Value("${salary.slip.logo.path:static/img.png}")
     private String logoPath;
+
+    private final CompanyDetails companyDetails;
+
+    public PdfService(CompanyDetails companyDetails) {
+        this.companyDetails = companyDetails;
+    }
 
     private Image getLogoImage() {
         try {
@@ -55,13 +63,22 @@ public class PdfService {
         document.add(new Paragraph(AppConstants.NEW_LINE));
 
         // CIN + Level
-        Paragraph cin = new Paragraph(AppConstants.COMPANY_CIN,
-                new Font(AppConstants.DEFAULT_FONT_FAMILY, AppConstants.FONT_SIZE_NORMAL, Font.BOLD));
-        document.add(cin);
+        String companyCin = StringUtils.hasText(companyDetails.getCin()) ? companyDetails.getCin() : "";
+        if (!companyCin.isEmpty()) {
+            Paragraph cin = new Paragraph(companyCin,
+                    new Font(AppConstants.DEFAULT_FONT_FAMILY, AppConstants.FONT_SIZE_NORMAL, Font.BOLD));
+            cin.setAlignment(AppConstants.DEFAULT_CELL_ALIGN_CENTER);
+            document.add(cin);
+        }
 
-        Paragraph level = new Paragraph(AppConstants.COMPANY_LEVEL + AppConstants.DOUBLE_NEW_LINE,
-                new Font(AppConstants.DEFAULT_FONT_FAMILY, AppConstants.FONT_SIZE_NORMAL, Font.BOLD));
-        document.add(level);
+        // Add company level
+        String companyLevel = StringUtils.hasText(companyDetails.getLevel()) ? companyDetails.getLevel() : "";
+        if (!companyLevel.isEmpty()) {
+            Paragraph level = new Paragraph(companyLevel + AppConstants.DOUBLE_NEW_LINE,
+                    new Font(AppConstants.DEFAULT_FONT_FAMILY, AppConstants.FONT_SIZE_NORMAL, Font.BOLD));
+            document.add(level);
+        }
+
 
         // Employee Info Table
         PdfPTable empTable = getEmpTable(emp);
@@ -223,7 +240,7 @@ public class PdfService {
         return headerTable;
     }
 
-    private static PdfPCell getParagraphCell() {
+    private PdfPCell getParagraphCell() {
         PdfPCell leftCell = new PdfPCell();
         leftCell.setBorder(AppConstants.NO_BORDER);
 
@@ -233,20 +250,28 @@ public class PdfService {
         title.setAlignment(AppConstants.DEFAULT_CELL_ALIGN_CENTER);
         leftCell.addElement(title);
 
-        Paragraph company = new Paragraph(AppConstants.COMPANY_NAME,
+        // Add company name and address
+        String companyName = StringUtils.hasText(companyDetails.getName()) ? companyDetails.getName() : AppConstants.COMPANY_NAME;
+
+        Paragraph company = new Paragraph(companyName,
                 new Font(AppConstants.DEFAULT_FONT_FAMILY, AppConstants.FONT_SIZE_HEADER, Font.BOLD));
         company.setAlignment(AppConstants.DEFAULT_CELL_ALIGN_CENTER);
         leftCell.addElement(company);
 
-        Paragraph address1 = new Paragraph(AppConstants.COMPANY_ADDRESS_LINE1,
+        String cAddressLine1 = StringUtils.hasText(companyDetails.getAddressLine1()) ? companyDetails.getAddressLine1() : AppConstants.COMPANY_ADDRESS_LINE1;
+
+        Paragraph address1 = new Paragraph(cAddressLine1,
                 new Font(AppConstants.DEFAULT_FONT_FAMILY, AppConstants.FONT_SIZE_HEADER, Font.BOLD));
         address1.setAlignment(AppConstants.DEFAULT_CELL_ALIGN_CENTER);
         leftCell.addElement(address1);
 
-        Paragraph address2 = new Paragraph(AppConstants.COMPANY_ADDRESS_LINE2,
+        String cAddressLine2 = StringUtils.hasText(companyDetails.getAddressLine2()) ? companyDetails.getAddressLine2() : AppConstants.COMPANY_ADDRESS_LINE2;
+
+        Paragraph address2 = new Paragraph(cAddressLine2,
                 new Font(AppConstants.DEFAULT_FONT_FAMILY, AppConstants.FONT_SIZE_HEADER, Font.BOLD));
         address2.setAlignment(AppConstants.DEFAULT_CELL_ALIGN_CENTER);
         leftCell.addElement(address2);
+
         return leftCell;
     }
 

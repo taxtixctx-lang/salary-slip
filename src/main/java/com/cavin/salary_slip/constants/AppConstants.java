@@ -48,11 +48,9 @@ public final class AppConstants {
     public static final float LOGO_MAX_HEIGHT = 80f;
 
     // Company Details Constants
-    public static final String COMPANY_NAME = "NK STOCK TALK PVT LTD";
+    public static final String COMPANY_NAME = "AVETA IVF";
     public static final String COMPANY_ADDRESS_LINE1 = "Rupaspur Ara Garden, Manglam Vihar Colony";
     public static final String COMPANY_ADDRESS_LINE2 = "B.V College, Patna - 800014";
-    public static final String COMPANY_CIN = "CIN NO. - U80903BR2022PTC055945";
-    public static final String COMPANY_LEVEL = "Level - 1 (5200 - 20200)";
     public static final String PDF_TITLE = "Pay Slip";
 
     // Employee Table Labels
@@ -72,7 +70,6 @@ public final class AppConstants {
     public static final String SUCCESS_MESSAGE_FORMAT = "Successfully generated %d salary slips in directory: %s";
     public static final String DIR_CREATE_ERROR = "Failed to create output directory";
     public static final String GENERATE_ERROR_FORMAT = "Error generating salary slips: %s";
-    public static final String SHEET_READ_ERROR_FORMAT = "Error reading sheet names: %s";
 
     // Table Header Labels
     public static final String EARNINGS_HEADER = "Earning (Rs.)";
